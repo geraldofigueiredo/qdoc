@@ -1,0 +1,21 @@
+[project]
+name = "qdoc"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8.3.3",
+    "crawl4ai>=0.8.6",
+    "google-genai>=1.74.0",
+    "langchain-text-splitters>=1.1.2",
+    "mcp>=1.27.0",
+    "playwright>=1.59.0",
+    "pydantic-settings>=2.14.0",
+    "qdrant-client>=1.17.1",
+    "rich>=15.0.0",
+    "textual>=8.2.5",
+]
+
+[project.scripts]
+qdoc = "qdoc.main:main"
