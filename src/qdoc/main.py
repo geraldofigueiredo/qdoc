@@ -3,9 +3,6 @@ import asyncio
 from rich.console import Console
 from rich.table import Table
 from qdoc.config import settings
-from qdoc.db import VectorDB
-from qdoc.embeddings import EmbeddingEngine
-from qdoc.crawler import DocumentationCrawler
 
 console = Console()
 
@@ -17,8 +14,6 @@ def cli(ctx):
         from qdoc.tui.app import QDocApp
         app = QDocApp()
         app.run()
-
-from qdoc.discovery import IntelligentDiscovery
 
 @cli.command("extract-nav")
 @click.option("--url", required=True, help="Root documentation page URL")
@@ -39,13 +34,13 @@ def extract_nav(url, output, selector):
 @click.option("--output", type=click.Path(), help="Output file to save the URLs")
 def discover(product_name, query, output):
     """Intelligently discover and filter URLs using Google Search and Gemini."""
+    from qdoc.discovery import IntelligentDiscovery
     if not query:
-        # Default query if none provided
         query = f"site:cloud.google.com/docs {product_name}"
-        
+
     discovery = IntelligentDiscovery()
     urls = asyncio.run(discovery.discover_and_filter(product_name, query))
-    
+
     if output:
         with open(output, "w") as f:
             for u in urls:
@@ -58,17 +53,16 @@ def discover(product_name, query, output):
 @cli.command()
 def status():
     """Display health metrics and DB status."""
+    from qdoc.db import VectorDB
     db = VectorDB()
     try:
         stats = db.get_stats()
         table = Table(title="qdoc Status")
         table.add_column("Metric", style="cyan")
         table.add_column("Value", style="magenta")
-        
         table.add_row("Qdrant Status", stats["status"])
         table.add_row("Total Vectors", str(stats["vectors_count"]))
         table.add_row("Collection", settings.QDRANT_COLLECTION)
-        
         console.print(table)
     except Exception as e:
         console.print(f"[red]Error connecting to Qdrant: {e}[/red]")
@@ -85,15 +79,18 @@ def status():
 @click.option("--sitemap-limit", default=10, help="Max sub-sitemaps to follow (default 10)")
 def ingest(service, all, rebuild, depth, url, list_only, url_file, sitemap, sitemap_limit):
     """Ingest documentation for a service."""
+    from qdoc.db import VectorDB
+    from qdoc.embeddings import EmbeddingEngine
+    from qdoc.crawler import DocumentationCrawler
+
     db = VectorDB()
     if not list_only:
         db.init_collection(rebuild=rebuild)
-    
+
     engine = EmbeddingEngine()
     crawler = DocumentationCrawler(db, engine)
-    
     service_name = service or "default"
-    
+
     if url_file:
         with open(url_file, "r") as f:
             urls = f.readlines()
@@ -113,7 +110,7 @@ def ingest(service, all, rebuild, depth, url, list_only, url_file, sitemap, site
         seed_url = url or settings.DEFAULT_SEED_URL
         console.print(f"[bold green]Starting ingestion for {service_name}...[/bold green]")
         asyncio.run(crawler.crawl_recursive(seed_url, service_name, depth, list_only=list_only))
-        
+
     if not list_only:
         console.print("[bold green]Ingestion complete![/bold green]")
 
@@ -123,15 +120,18 @@ def ingest(service, all, rebuild, depth, url, list_only, url_file, sitemap, site
 @click.option("--limit", default=5, help="Result limit")
 def query(query_text, service, limit):
     """Search for chunks using a natural language query."""
+    from qdoc.db import VectorDB
+    from qdoc.embeddings import EmbeddingEngine
+
     db = VectorDB()
     engine = EmbeddingEngine()
-    
+
     console.print(f"[bold blue]Searching for:[/bold blue] {query_text}")
     vector = engine.get_query_embedding(query_text)
-    
+
     service_filter = [service] if service else None
     results = db.search(vector, service_filter=service_filter, limit=limit)
-    
+
     for i, res in enumerate(results):
         console.print(f"\n[bold yellow]Result {i+1} (Score: {res['score']:.4f})[/bold yellow]")
         console.print(f"[dim]Source: {res['url']}[/dim]")
@@ -141,10 +141,10 @@ def query(query_text, service, limit):
 @click.option("--yes", is_flag=True, help="Skip confirmation")
 def clear(yes):
     """Clear all data from the collection."""
+    from qdoc.db import VectorDB
     if not yes:
         if not click.confirm("Are you sure you want to clear all data?"):
             return
-            
     db = VectorDB()
     db.init_collection(rebuild=True)
     console.print("[bold green]Collection cleared successfully![/bold green]")
