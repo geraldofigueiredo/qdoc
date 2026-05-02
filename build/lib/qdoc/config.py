@@ -12,10 +12,8 @@ class Settings(BaseSettings):
     GOOGLE_CLOUD_PROJECT: Optional[str] = None
     GOOGLE_CLOUD_LOCATION: str = "us-central1"
     EMBEDDING_MODEL: str = "text-embedding-004"
-    GENAI_MODEL: str = "gemini-2.0-flash"
 
     # Crawler
     DEFAULT_SEED_URL: str = "https://docs.cloud.google.com/customer-engagement-ai/conversational-agents/ps"
-    MAX_CONCURRENT_REQUESTS: int = 10
 
 settings = Settings()
