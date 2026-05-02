@@ -23,7 +23,7 @@ from qdoc.discovery import IntelligentDiscovery
 @cli.command("extract-nav")
 @click.option("--url", required=True, help="Root documentation page URL")
 @click.option("--output", default="extract-nav-links.txt", show_default=True, help="Output file path")
-@click.option("--selector", default=".devsite-book-nav a", show_default=True, help="CSS selector for nav links")
+@click.option("--selector", default="devsite-book-nav a", show_default=True, help="CSS selector for nav links")
 def extract_nav(url, output, selector):
     """Extract sidebar nav links from a documentation page into a file."""
     from qdoc.nav_extractor import NavExtractor

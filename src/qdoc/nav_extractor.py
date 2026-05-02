@@ -1,4 +1,4 @@
-from urllib.parse import urlparse, parse_qs, urlunparse, urlencode
+from urllib.parse import urlparse, parse_qs, urlunparse, urlencode, urljoin
 from typing import List
 from rich.console import Console
 
@@ -34,10 +34,11 @@ class NavExtractor:
         result = []
 
         for href in hrefs:
-            if not href or not href.startswith("http"):
+            if not href or href.startswith(("#", "javascript:", "mailto:")):
                 continue
 
-            parsed = urlparse(href)
+            full_url = href if href.startswith("http") else urljoin(base_url, href)
+            parsed = urlparse(full_url)
             if parsed.netloc != parsed_base.netloc:
                 continue
 
@@ -45,14 +46,14 @@ class NavExtractor:
             if any(p in path for p in self.EXCLUDE_PATTERNS):
                 continue
 
-            normalized = self._normalize_url(href)
+            normalized = self._normalize_url(full_url)
             if normalized not in seen:
                 seen.add(normalized)
                 result.append(normalized)
 
         return sorted(result)
 
-    async def extract(self, url: str, selector: str = ".devsite-book-nav a") -> List[str]:
+    async def extract(self, url: str, selector: str = "devsite-book-nav a") -> List[str]:
         from playwright.async_api import async_playwright
 
         async with async_playwright() as p:
