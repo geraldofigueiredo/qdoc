@@ -35,41 +35,42 @@ def search_gcp_docs(query: str, services_filter: Optional[List[str]] = None, lim
     current_query = query
     max_retries = 5
     all_chunks = []
-    seen_urls = set()
-    
+    seen_chunk_keys: set = set()
+    seen_urls: set = set()
+
     for attempt in range(max_retries):
-        # 1. Vector Search
+        # 1. Vector search
         vector = embed_engine.get_query_embedding(current_query)
         results = db.search(vector, service_filter=services_filter, limit=limit)
-        
+
         if not results:
             if attempt == 0:
                 return "No documentation found for this query."
-            break # Try to answer with what we have
-            
-        # Add new chunks to our context
-        new_chunks = []
-        for res in results:
-            if res['url'] + res['content'][:50] not in seen_urls:
-                new_chunks.append(res['content'])
-                seen_urls.add(res['url'] + res['content'][:50])
-        
-        all_chunks.extend(new_chunks)
-        
-        # 2. Reasoning/Evaluation
-        is_sufficient = llm_engine.evaluate_results(query, all_chunks)
-        
-        if is_sufficient:
-            # 3. Generate final answer
-            return llm_engine.generate_answer(query, all_chunks)
-        
-        # 4. Query Augmentation
-        current_query = llm_engine.augment_query(query, current_query)
-        
-    # Final attempt to answer with whatever we gathered
+            break
+
+        # 2. Expand: fetch all chunks from the top matched URLs
+        matched_urls = list(dict.fromkeys(r["url"] for r in results))[:3]
+        for url in matched_urls:
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
+            for chunk_data in db.get_all_chunks_by_url(url):
+                key = url + chunk_data.get("content", "")[:50]
+                if key not in seen_chunk_keys:
+                    all_chunks.append(chunk_data["content"])
+                    seen_chunk_keys.add(key)
+
+        # 3. Always augment query using what was already found as context
+        current_query = llm_engine.augment_query(query, current_query, all_chunks)
+
+        # 4. Evaluate sufficiency only after first augmentation pass
+        if attempt > 0:
+            if llm_engine.evaluate_results(query, all_chunks):
+                return llm_engine.generate_answer(query, all_chunks)
+
     if all_chunks:
         return llm_engine.generate_answer(query, all_chunks)
-        
+
     return "I couldn't find enough information to answer your query after multiple attempts."
 
 async def serve_mcp():

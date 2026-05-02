@@ -54,13 +54,17 @@ class LLMEngine:
         """
         return self.generate(prompt)
 
-    def augment_query(self, original_query: str, last_query: str) -> str:
-        """Generate a new search query to find missing information."""
+    def augment_query(self, original_query: str, last_query: str, found_chunks: List[str] = None) -> str:
+        """Generate a new search query targeting information missing from found_chunks."""
+        context_section = ""
+        if found_chunks:
+            preview = "\n---\n".join(found_chunks[:4])
+            context_section = f"\nInformation already retrieved:\n{preview}\n\nGenerate a query that finds the MISSING parts not covered above."
+
         prompt = f"""
         We are searching for information to answer: "{original_query}"
         Our last search query was: "{last_query}"
-        The results were insufficient.
-        
+        {context_section}
         Generate a new, better search query (single line) to find the missing information in a technical documentation database.
         Output ONLY the new query string.
         """

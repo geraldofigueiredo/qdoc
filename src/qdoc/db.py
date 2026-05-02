@@ -105,6 +105,18 @@ class VectorDB:
             
         return output
 
+    def get_all_chunks_by_url(self, url: str) -> List[Dict[str, Any]]:
+        """Fetch all chunks stored for a given URL."""
+        results, _ = self.client.scroll(
+            collection_name=self.collection_name,
+            scroll_filter=models.Filter(
+                must=[models.FieldCondition(key="url", match=models.MatchValue(value=url))]
+            ),
+            limit=200,
+            with_payload=True
+        )
+        return [p.payload for p in results]
+
     def list_chunks(self, limit: int = 20) -> List[Dict[str, Any]]:
         """List chunks for the TUI explorer."""
         results, _ = self.client.scroll(
