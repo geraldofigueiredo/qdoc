@@ -18,6 +18,43 @@ def cli(ctx):
         app = QDocApp()
         app.run()
 
+from qdoc.discovery import IntelligentDiscovery
+
+@cli.command("extract-nav")
+@click.option("--url", required=True, help="Root documentation page URL")
+@click.option("--output", default="extract-nav-links.txt", show_default=True, help="Output file path")
+@click.option("--selector", default=".devsite-book-nav a", show_default=True, help="CSS selector for nav links")
+def extract_nav(url, output, selector):
+    """Extract sidebar nav links from a documentation page into a file."""
+    from qdoc.nav_extractor import NavExtractor
+    links = asyncio.run(NavExtractor().extract(url, selector))
+    with open(output, "w") as f:
+        for link in links:
+            f.write(f"{link}\n")
+    console.print(f"[bold green]Saved {len(links)} links to {output}[/bold green]")
+
+@cli.command()
+@click.argument("product_name")
+@click.option("--query", help="Google Search query (e.g., 'site:cloud.google.com/product')")
+@click.option("--output", type=click.Path(), help="Output file to save the URLs")
+def discover(product_name, query, output):
+    """Intelligently discover and filter URLs using Google Search and Gemini."""
+    if not query:
+        # Default query if none provided
+        query = f"site:cloud.google.com/docs {product_name}"
+        
+    discovery = IntelligentDiscovery()
+    urls = asyncio.run(discovery.discover_and_filter(product_name, query))
+    
+    if output:
+        with open(output, "w") as f:
+            for u in urls:
+                f.write(f"{u}\n")
+        console.print(f"[bold green]Saved {len(urls)} URLs to {output}[/bold green]")
+    else:
+        for u in urls:
+            console.print(u)
+
 @cli.command()
 def status():
     """Display health metrics and DB status."""
