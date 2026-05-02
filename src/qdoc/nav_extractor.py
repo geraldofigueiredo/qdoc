@@ -30,6 +30,7 @@ class NavExtractor:
 
     def _filter_links(self, hrefs: List[str], base_url: str) -> List[str]:
         parsed_base = urlparse(base_url)
+        path_prefix = parsed_base.path.rstrip("/")
         seen: set = set()
         result = []
 
@@ -40,6 +41,9 @@ class NavExtractor:
             full_url = href if href.startswith("http") else urljoin(base_url, href)
             parsed = urlparse(full_url)
             if parsed.netloc != parsed_base.netloc:
+                continue
+
+            if not parsed.path.rstrip("/").startswith(path_prefix):
                 continue
 
             path = parsed.path.lower()
