@@ -2,3 +2,8 @@ qdrant_storage
 *.egg-info
 __pycache__
 *.env
+build/
+temp/
+*.txt
+.venv/
+dist/
