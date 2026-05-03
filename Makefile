@@ -21,6 +21,10 @@ help:
 
 install:
 	uv tool install --force .
+	uv run playwright install chromium
+
+setup:
+	uv run playwright install chromium
 
 up:
 	docker compose up -d
@@ -29,25 +33,29 @@ down:
 	docker compose down
 
 clear:
-	uv run qdoc clear
+	PYTHONPATH=src uv run python -m qdoc.main clear
 
 ingest:
-	uv run qdoc ingest --depth $(DEPTH) --url $(URL)
+	PYTHONPATH=src uv run python -m qdoc.main ingest --depth $(DEPTH) --url $(URL)
 
 list:
-	uv run qdoc ingest --depth $(DEPTH) --url $(URL) --list-only
+	PYTHONPATH=src uv run python -m qdoc.main ingest --depth $(DEPTH) --url $(URL) --list-only
 
 sitemap-list:
 	@if [ -z "$(SITEMAP)" ]; then echo "Erro: Use make sitemap-list SITEMAP=url"; exit 1; fi
-	uv run qdoc ingest --sitemap $(SITEMAP) --url $(URL) --list-only --sitemap-limit $(SITEMAP_LIMIT)
+	PYTHONPATH=src uv run python -m qdoc.main ingest --sitemap $(SITEMAP) --url $(URL) --list-only --sitemap-limit $(SITEMAP_LIMIT)
 
 sitemap-ingest:
 	@if [ -z "$(SITEMAP)" ]; then echo "Erro: Use make sitemap-ingest SITEMAP=url"; exit 1; fi
-	uv run qdoc ingest --sitemap $(SITEMAP) --url $(URL) --sitemap-limit $(SITEMAP_LIMIT)
+	PYTHONPATH=src uv run python -m qdoc.main ingest --sitemap $(SITEMAP) --url $(URL) --sitemap-limit $(SITEMAP_LIMIT)
 
 tui:
-	uv run qdoc
+	PYTHONPATH=src uv run python -m qdoc.main
 
 query:
 	@if [ -z "$(Q)" ]; then echo "Erro: Use make query Q=\"sua busca\""; exit 1; fi
-	uv run qdoc query "$(Q)" --limit $(LIMIT)
+	PYTHONPATH=src uv run python -m qdoc.main query "$(Q)" --limit $(LIMIT)
+
+discover:
+	@if [ -z "$(P)" ]; then echo "Erro: Use make discover P=\"nome do produto\" QUERY=\"site:url\""; exit 1; fi
+	PYTHONPATH=src uv run python -m qdoc.main discover "$(P)" --query "$(QUERY)" --output links.txt
