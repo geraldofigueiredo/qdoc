@@ -16,6 +16,6 @@ class Settings(BaseSettings):
 
     # Crawler
     DEFAULT_SEED_URL: str = "https://docs.cloud.google.com/customer-engagement-ai/conversational-agents/ps"
-    MAX_CONCURRENT_REQUESTS: int = 10
+    MAX_CONCURRENT_REQUESTS: int = 20
 
 settings = Settings()
