@@ -1,16 +1,43 @@
 from qdrant_client import QdrantClient, models
-from qdoc.config import settings
+from qdoc.infrastructure.config import settings
+from qdoc.domain.models.document import Chunk, SearchResult
+from qdoc.domain.repository import VectorRepository
 import uuid
 from typing import List, Dict, Any, Optional
 
-class VectorDB:
+from rich.console import Console
+
+console = Console()
+
+class QdrantVectorRepository(VectorRepository):
+    _client_instance = None
+
     def __init__(self):
-        self.client = QdrantClient(url=settings.QDRANT_URL)
         self.collection_name = settings.QDRANT_COLLECTION
         self.vector_size = 768  # text-embedding-004
+        self._init_client()
+
+    def _init_client(self):
+        if QdrantVectorRepository._client_instance:
+            self.client = QdrantVectorRepository._client_instance
+            return
+
+        try:
+            if settings.QDRANT_URL.startswith(("http://", "https://")):
+                self.client = QdrantClient(url=settings.QDRANT_URL)
+            else:
+                import os
+                os.makedirs(settings.QDRANT_URL, exist_ok=True)
+                self.client = QdrantClient(path=settings.QDRANT_URL)
+            
+            QdrantVectorRepository._client_instance = self.client
+        except Exception as e:
+            if "already accessed by another instance" in str(e):
+                console.print("[bold red]Concurrency Error:[/bold red] The vector database is locked by another process.")
+                console.print("[yellow]Tip:[/yellow] Close other qdoc instances (Claude Code, Gemini CLI, or TUI) or use a Qdrant Server (Docker).")
+            raise e
 
     def init_collection(self, rebuild: bool = False):
-        """Initialize the collection and payload indexes."""
         if rebuild:
             self.client.delete_collection(self.collection_name)
 
@@ -22,7 +49,6 @@ class VectorDB:
                     distance=models.Distance.COSINE
                 )
             )
-            # Create payload index for 'service' and 'url'
             self.client.create_payload_index(
                 collection_name=self.collection_name,
                 field_name="service",
@@ -35,8 +61,7 @@ class VectorDB:
             )
 
     def get_existing_hash(self, url: str) -> Optional[str]:
-        """Get the hash of an existing page in the DB."""
-        results = self.client.scroll(
+        results, _ = self.client.scroll(
             collection_name=self.collection_name,
             scroll_filter=models.Filter(
                 must=[models.FieldCondition(key="url", match=models.MatchValue(value=url))]
@@ -44,13 +69,11 @@ class VectorDB:
             limit=1,
             with_payload=True
         )
-        points, _ = results
-        if points:
-            return points[0].payload.get("hash")
+        if results:
+            return results[0].payload.get("hash")
         return None
 
     def delete_by_url(self, url: str):
-        """Delete all points associated with a URL."""
         self.client.delete(
             collection_name=self.collection_name,
             points_selector=models.FilterSelector(
@@ -60,16 +83,22 @@ class VectorDB:
             )
         )
 
-    def upsert_chunks(self, chunks: List[str], embeddings: List[List[float]], metadata: Dict[str, Any]):
-        """Upsert chunks with embeddings and metadata."""
+    def upsert_chunks(self, chunks: List[Chunk], service: str, url: str, doc_hash: str) -> None:
+        import time
         points = []
-        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+        for chunk in chunks:
             point_id = str(uuid.uuid4())
-            payload = metadata.copy()
-            payload["content"] = chunk
+            payload = chunk.metadata.copy()
+            payload.update({
+                "content": chunk.content,
+                "url": url,
+                "service": service,
+                "hash": doc_hash,
+                "updated_at": time.time()
+            })
             points.append(models.PointStruct(
                 id=point_id,
-                vector=embedding,
+                vector=chunk.vector,
                 payload=payload
             ))
         
@@ -78,16 +107,27 @@ class VectorDB:
             points=points
         )
 
-    def search(self, vector: List[float], service_filter: Optional[List[str]] = None, limit: int = 5) -> List[Dict[str, Any]]:
-        """Search for similar chunks."""
-        query_filter = None
+    def search(
+        self, 
+        vector: List[float], 
+        service_filter: Optional[List[str]] = None, 
+        url_filter: Optional[str] = None,
+        limit: int = 10
+    ) -> List[SearchResult]:
+        must_filters = []
+        
         if service_filter:
-            query_filter = models.Filter(
+            must_filters.append(models.Filter(
                 should=[
                     models.FieldCondition(key="service", match=models.MatchValue(value=s))
                     for s in service_filter
                 ]
-            )
+            ))
+            
+        if url_filter:
+            must_filters.append(models.FieldCondition(key="url", match=models.MatchValue(value=url_filter)))
+
+        query_filter = models.Filter(must=must_filters) if must_filters else None
 
         results = self.client.query_points(
             collection_name=self.collection_name,
@@ -97,16 +137,17 @@ class VectorDB:
             with_payload=True
         )
         
-        output = []
-        for hit in results.points:
-            data = hit.payload.copy()
-            data["score"] = hit.score
-            output.append(data)
-            
-        return output
+        return [
+            SearchResult(
+                content=hit.payload["content"],
+                url=hit.payload["url"],
+                score=hit.score,
+                metadata=hit.payload
+            )
+            for hit in results.points
+        ]
 
-    def get_all_chunks_by_url(self, url: str) -> List[Dict[str, Any]]:
-        """Fetch all chunks stored for a given URL."""
+    def get_all_chunks_by_url(self, url: str) -> List[dict]:
         results, _ = self.client.scroll(
             collection_name=self.collection_name,
             scroll_filter=models.Filter(
@@ -117,21 +158,9 @@ class VectorDB:
         )
         return [p.payload for p in results]
 
-    def list_chunks(self, limit: int = 20) -> List[Dict[str, Any]]:
-        """List chunks for the TUI explorer."""
-        results, _ = self.client.scroll(
-            collection_name=self.collection_name,
-            limit=limit,
-            with_payload=True
-        )
-        return [p.payload for p in results]
-
-    def get_stats(self) -> Dict[str, Any]:
-        """Get collection statistics."""
+    def get_stats(self) -> dict:
         info = self.client.get_collection(self.collection_name)
         return {
             "vectors_count": info.points_count,
             "status": info.status,
-            # Qdrant info doesn't easily give disk size in MB without deeper API calls or storage info
-            # For simplicity, we'll return the points count.
         }

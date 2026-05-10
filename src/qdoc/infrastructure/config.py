@@ -5,7 +5,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Qdrant
-    QDRANT_URL: str = "http://localhost:6333"
+    # Use a URL (http://...) for Docker/Remote, or a path for Embedded mode
+    QDRANT_URL: str = "qdrant_storage"
     QDRANT_COLLECTION: str = "gcp_docs"
 
     # Google Cloud / Vertex AI
