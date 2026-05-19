@@ -1,7 +1,7 @@
 [project]
 name = "qdoc"
 version = "0.1.0"
-description = "Add your description here"
+description = "Intelligent GCP Documentation RAG: AI-powered crawler, Qdrant vector search, Gemini-driven insights, and a sleek Textual TUI with MCP server integration."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
