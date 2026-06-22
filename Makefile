@@ -20,9 +20,7 @@ help:
 	@echo "  make query        Testa uma query (uso: make query Q=\"sua busca\" LIMIT=5)"
 
 install:
-	uv tool install --force .
-	uv run playwright install chromium
-
+	PYTHONPATH=src uv run python scripts/install.py
 setup:
 	uv run playwright install chromium
 

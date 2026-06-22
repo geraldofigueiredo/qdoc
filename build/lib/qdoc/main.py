@@ -42,20 +42,43 @@ def status():
 @click.option("--rebuild", is_flag=True, help="Drop and rebuild collection")
 @click.option("--depth", default=0, help="Crawl depth")
 @click.option("--url", help="Override seed URL")
-def ingest(service, all, rebuild, depth, url):
+@click.option("--list-only", is_flag=True, help="Only list URLs without ingesting")
+@click.option("--file", "url_file", type=click.Path(exists=True), help="Ingest from a file containing URLs")
+@click.option("--sitemap", help="Discover URLs from a sitemap.xml")
+@click.option("--sitemap-limit", default=10, help="Max sub-sitemaps to follow (default 10)")
+def ingest(service, all, rebuild, depth, url, list_only, url_file, sitemap, sitemap_limit):
     """Ingest documentation for a service."""
     db = VectorDB()
-    db.init_collection(rebuild=rebuild)
+    if not list_only:
+        db.init_collection(rebuild=rebuild)
     
     engine = EmbeddingEngine()
     crawler = DocumentationCrawler(db, engine)
     
-    seed_url = url or settings.DEFAULT_SEED_URL
     service_name = service or "default"
     
-    console.print(f"[bold green]Starting ingestion for {service_name}...[/bold green]")
-    asyncio.run(crawler.crawl_recursive(seed_url, service_name, depth))
-    console.print("[bold green]Ingestion complete![/bold green]")
+    if url_file:
+        with open(url_file, "r") as f:
+            urls = f.readlines()
+        console.print(f"[bold green]Ingesting {len(urls)} URLs from {url_file}...[/bold green]")
+        asyncio.run(crawler.ingest_from_list(urls, service_name))
+    elif sitemap:
+        seed_url = url or settings.DEFAULT_SEED_URL
+        urls = asyncio.run(crawler.get_urls_from_sitemap(sitemap, seed_url, max_sub_sitemaps=sitemap_limit))
+        if list_only:
+            for u in urls:
+                console.print(u)
+            console.print(f"\n[bold green]Total URLs found in sitemap:[/bold green] {len(urls)}")
+        else:
+            console.print(f"[bold green]Ingesting {len(urls)} URLs from sitemap...[/bold green]")
+            asyncio.run(crawler.ingest_from_list(urls, service_name))
+    else:
+        seed_url = url or settings.DEFAULT_SEED_URL
+        console.print(f"[bold green]Starting ingestion for {service_name}...[/bold green]")
+        asyncio.run(crawler.crawl_recursive(seed_url, service_name, depth, list_only=list_only))
+        
+    if not list_only:
+        console.print("[bold green]Ingestion complete![/bold green]")
 
 @cli.command()
 @click.argument("query_text")
