@@ -114,7 +114,7 @@ This provides the `search_gcp_docs` tool, which uses an agentic retry loop to en
 *   **Vector Database**: [Qdrant](https://qdrant.tech/)
 *   **Embeddings**: Google Vertex AI `text-embedding-004`
 *   **LLM**: Gemini 2.0 Flash
-*   **UI**: [Textual](https://textual.textualize.io/) (TUI)
+*   **UI**: [Textual](https://textual.textualize.io/)
 *   **Interface**: [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 
 ---
@@ -122,3 +122,5 @@ This provides the `search_gcp_docs` tool, which uses an agentic retry loop to en
 ## 📜 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+
